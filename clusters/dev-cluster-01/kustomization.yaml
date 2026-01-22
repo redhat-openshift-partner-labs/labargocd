@@ -47,12 +47,6 @@ patches:
         value: dev-cluster-01-ssh-key
       - op: remove
         path: /spec/provisioning/manifestsConfigMapRef
-      - op: replace
-        path: /spec/clusterMetadata/adminKubeconfigSecretRef/name
-        value: dev-cluster-01-admin-kubeconfig
-      - op: replace
-        path: /spec/clusterMetadata/adminPasswordSecretRef/name
-        value: dev-cluster-01-admin-password
 
   # Update MachinePool with specific values
   - target:
@@ -171,17 +165,4 @@ patches:
           sshKey: |
             ssh-rsa AAAA...placeholder
 
-# Update all placeholder references
-replacements:
-  - source:
-      kind: ConfigMap
-      name: cluster-config
-      fieldPath: data.clusterName
-    targets:
-      - select:
-          kind: ClusterDeployment
-        fieldPaths:
-          - spec.clusterMetadata.adminKubeconfigSecretRef.name
-        options:
-          delimiter: '-'
-          index: 0
+# Hive will automatically populate clusterMetadata fields after provisioning

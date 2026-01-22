@@ -20,15 +20,6 @@ spec:
         name: aws-credentials
       region: us-east-1  # Will be overridden by overlay
 
-  # Cluster metadata
-  clusterMetadata:
-    adminKubeconfigSecretRef:
-      name: cluster-placeholder-admin-kubeconfig
-    adminPasswordSecretRef:
-      name: cluster-placeholder-admin-password
-    clusterID: ""
-    infraID: ""
-
   # Provisioning configuration
   provisioning:
     installConfigSecretRef:
