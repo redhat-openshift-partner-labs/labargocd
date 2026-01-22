@@ -39,6 +39,20 @@ patches:
       - op: replace
         path: /spec/provisioning/imageSetRef/name
         value: openshift-v4.14.0
+      - op: replace
+        path: /spec/provisioning/installConfigSecretRef/name
+        value: dev-cluster-01-install-config
+      - op: replace
+        path: /spec/provisioning/sshPrivateKeySecretRef/name
+        value: dev-cluster-01-ssh-key
+      - op: remove
+        path: /spec/provisioning/manifestsConfigMapRef
+      - op: replace
+        path: /spec/clusterMetadata/adminKubeconfigSecretRef/name
+        value: dev-cluster-01-admin-kubeconfig
+      - op: replace
+        path: /spec/clusterMetadata/adminPasswordSecretRef/name
+        value: dev-cluster-01-admin-password
 
   # Update MachinePool with specific values
   - target:
