@@ -13,12 +13,12 @@ data:
 
   # Control plane configuration
   controlPlaneInstanceType: m5.xlarge
-  controlPlaneReplicas: "3"
+  controlPlaneReplicas: "1"
 
   # Worker configuration
   workerInstanceType: m5.2xlarge
-  workerReplicas: "3"
-  workerZones: "us-east-1a,us-east-1b,us-east-1c"
+  workerReplicas: "0"
+  workerZones: "us-east-1a"
 
   # Networking
   clusterNetworkCIDR: 10.128.0.0/14

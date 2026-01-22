@@ -118,9 +118,7 @@ patches:
                   type: gp3
                 zones:
                   - us-east-1a
-                  - us-east-1b
-                  - us-east-1c
-            replicas: 3
+            replicas: 1
 
           compute:
             - name: worker
@@ -133,9 +131,7 @@ patches:
                     type: gp3
                   zones:
                     - us-east-1a
-                    - us-east-1b
-                    - us-east-1c
-              replicas: 3
+              replicas: 0
 
           networking:
             clusterNetwork:
