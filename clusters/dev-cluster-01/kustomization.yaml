@@ -161,8 +161,5 @@ patches:
 
           fips: false
           publish: External
-          pullSecret: '{"auths":{"fake":{"auth":"aW52YWxpZAo="}}}'
-          sshKey: |
-            ssh-rsa AAAA...placeholder
 
 # Hive will automatically populate clusterMetadata fields after provisioning
