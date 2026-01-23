@@ -26,7 +26,7 @@ spec:
   syncPolicy:
     automated:
       prune: false  # Don't auto-delete cluster resources
-      selfHeal: true
+      selfHeal: false  # CRITICAL: Disable selfHeal to prevent deletion of Hive-created secrets
       allowEmpty: false
     syncOptions:
       - PrunePropagationPolicy=foreground

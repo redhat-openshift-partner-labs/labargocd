@@ -4,21 +4,38 @@ This template provisions a highly available OpenShift cluster on AWS with 3 cont
 
 ## ⚠️ CRITICAL: ArgoCD Configuration Requirement
 
-**If using ArgoCD for cluster provisioning, you MUST configure `ignoreDifferences` correctly to prevent cluster deletion failures.**
+**If using ArgoCD for cluster provisioning, you MUST disable selfHeal to prevent cluster deletion failures.**
 
-Hive creates critical secrets during provisioning (`metadata-json`, `admin-kubeconfig`, `admin-password`) and references them in the ClusterDeployment's `spec.clusterMetadata` section. If ArgoCD's selfHeal doesn't ignore this entire section, **it will delete these secrets**, causing deprovisioning to fail.
+### The Problem
+
+Hive creates critical secrets during cluster provisioning:
+- `<cluster>-metadata-json` - Required for AWS resource cleanup during deletion
+- `<cluster>-admin-kubeconfig` - Admin access to provisioned cluster
+- `<cluster>-admin-password` - Admin password
+
+These secrets are **NOT defined in Git**. When ArgoCD's `selfHeal: true` is enabled, ArgoCD reconciles ALL resources in the namespace against Git. Since these secrets aren't in Git, **selfHeal deletes them**, causing deprovisioning to fail with:
+```
+error="secrets \"<cluster>-metadata-json\" not found"
+```
 
 ### Required ArgoCD Application Configuration
 
 ```yaml
 spec:
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: false  # CRITICAL: Must be false to preserve Hive-created secrets
+      allowEmpty: false
+
+  # Also configure ignoreDifferences to prevent drift detection
   ignoreDifferences:
     - group: hive.openshift.io
       kind: ClusterDeployment
       jsonPointers:
         - /status
-        - /spec/clusterMetadata  # CRITICAL: Must ignore entire section
-        - /spec/installed  # Also ignore installed timestamp
+        - /spec/clusterMetadata  # Prevents drift in ClusterDeployment spec
+        - /spec/installed
     - group: cluster.open-cluster-management.io
       kind: ManagedCluster
       jsonPointers:
@@ -26,7 +43,9 @@ spec:
         - /spec/managedClusterClientConfigs
 ```
 
-**WARNING**: Do NOT use partial paths like `/spec/clusterMetadata/clusterID` - this will NOT prevent the secret deletion issue.
+### Why ignoreDifferences Alone Doesn't Work
+
+`ignoreDifferences` only prevents ArgoCD from detecting drift in the **ClusterDeployment spec fields**. It does NOT prevent ArgoCD from deleting the **actual secret resources** during namespace reconciliation. SelfHeal reconciles all resources in the namespace, not just the ClusterDeployment.
 
 See the [main README troubleshooting section](../../README.md) for more details.
 
