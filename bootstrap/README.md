@@ -50,6 +50,22 @@ Runs every 5 minutes to clean up after cluster deletions:
 
 ## Deployment
 
+### Prerequisites
+
+The cleanup CronJob uses `registry.redhat.io/openshift4/ose-cli:v4.14` which requires a pull secret in the `openshift-gitops` namespace:
+
+```bash
+# Create pull secret for CronJob (using your Red Hat pull secret)
+oc create secret generic deprovision-cleanup-pull-secret \
+  --from-file=.dockerconfigjson=pull-secret.json \
+  --type=kubernetes.io/dockerconfigjson \
+  -n openshift-gitops
+```
+
+**Note**: Update `deprovision-cleanup-cronjob.yaml` to reference your pull secret name in `spec.jobTemplate.spec.template.spec.imagePullSecrets`.
+
+### Apply Resources
+
 Apply bootstrap resources in order:
 
 ```bash

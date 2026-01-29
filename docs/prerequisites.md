@@ -137,3 +137,19 @@ oc create clusterrolebinding openshift-gitops-cluster-admin \
   --clusterrole=cluster-admin \
   --serviceaccount=openshift-gitops:openshift-gitops-argocd-application-controller
 ```
+
+## Pull Secret for Cleanup CronJob
+
+The deprovision cleanup CronJob runs in `openshift-gitops` namespace and uses `registry.redhat.io/openshift4/ose-cli:v4.14`. This requires a pull secret:
+
+```bash
+# Create pull secret in openshift-gitops namespace
+oc create secret generic deprovision-cleanup-pull-secret \
+  --from-file=.dockerconfigjson=pull-secret.json \
+  --type=kubernetes.io/dockerconfigjson \
+  -n openshift-gitops
+```
+
+Update `bootstrap/deprovision-cleanup-cronjob.yaml` to reference your secret name in `imagePullSecrets`.
+
+**Note**: The PostSync job in each cluster namespace uses the `pull-secret` that's already a cluster prerequisite.

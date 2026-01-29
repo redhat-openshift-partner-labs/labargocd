@@ -219,6 +219,37 @@ oc kustomize clusters/<cluster> | oc apply -f -
 oc get pods -n <cluster> -w
 ```
 
+## Image Pull Errors
+
+### CronJob or PostSync Job fails with ImagePullBackOff
+
+**Symptoms**: Job pods show `ImagePullBackOff` or `ErrImagePull`
+
+**Cause**: Missing pull secret for `registry.redhat.io/openshift4/ose-cli:v4.14`
+
+**For CronJob** (runs in `openshift-gitops`):
+```bash
+# Create pull secret
+oc create secret generic deprovision-cleanup-pull-secret \
+  --from-file=.dockerconfigjson=pull-secret.json \
+  --type=kubernetes.io/dockerconfigjson \
+  -n openshift-gitops
+
+# Update cronjob to reference it (edit imagePullSecrets in the manifest)
+```
+
+**For PostSync Job** (runs in cluster namespace):
+```bash
+# Verify pull-secret exists in cluster namespace
+oc get secret pull-secret -n <cluster-namespace>
+
+# If missing, create it
+oc create secret generic pull-secret \
+  --from-file=.dockerconfigjson=pull-secret.json \
+  --type=kubernetes.io/dockerconfigjson \
+  -n <cluster-namespace>
+```
+
 ## Cleanup After Failed Provision
 
 If a cluster fails to provision and leaves orphaned AWS resources:
