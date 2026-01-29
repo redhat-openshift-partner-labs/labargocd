@@ -5,150 +5,64 @@ namespace: mhillsma-cluster
 
 resources:
   - ../../cluster-templates/aws-ha/base
-  - cluster-config.yaml
-  #- cluster-start-cronjob.yaml
 
-# Patches to customize the cluster
 patches:
-  # Update ClusterDeployment with specific values
-  - target:
+  # Install config secret (extracted to separate file)
+  - path: patches/install-config.yaml
+
+  # ClusterDeployment configuration
+  - patch: |-
+      apiVersion: hive.openshift.io/v1
       kind: ClusterDeployment
-    patch: |-
-      - op: replace
-        path: /metadata/name
-        value: mhillsma-cluster
-      - op: replace
-        path: /metadata/namespace
-        value: mhillsma-cluster
-      - op: replace
-        path: /spec/clusterName
-        value: mhillsma-cluster
-      - op: replace
-        path: /spec/baseDomain
-        value: openshiftpartnerlabs.com
-      - op: replace
-        path: /spec/platform/aws/region
-        value: us-east-1
-      - op: replace
-        path: /spec/provisioning/imageSetRef/name
-        value: img4.20.10-x86-64-appsub
-      - op: replace
-        path: /spec/provisioning/installConfigSecretRef/name
-        value: mhillsma-cluster-install-config
-      - op: replace
-        path: /spec/provisioning/sshPrivateKeySecretRef/name
-        value: mhillsma-cluster-ssh-key
-      - op: remove
-        path: /spec/provisioning/manifestsConfigMapRef
+      metadata:
+        name: cluster-placeholder
+        namespace: mhillsma-cluster
+      spec:
+        clusterName: mhillsma-cluster
+        baseDomain: openshiftpartnerlabs.com
+        platform:
+          aws:
+            region: us-east-1
+        provisioning:
+          imageSetRef:
+            name: img4.20.10-x86-64-appsub
+          installConfigSecretRef:
+            name: mhillsma-cluster-install-config
+          sshPrivateKeySecretRef:
+            name: mhillsma-cluster-ssh-key
+          manifestsConfigMapRef: null
 
-  # Update MachinePool with specific values
-  - target:
+  # MachinePool configuration
+  - patch: |-
+      apiVersion: hive.openshift.io/v1
       kind: MachinePool
-    patch: |-
-      - op: replace
-        path: /metadata/name
-        value: mhillsma-cluster-worker
-      - op: replace
-        path: /metadata/namespace
-        value: mhillsma-cluster
-      - op: replace
-        path: /spec/clusterDeploymentRef/name
-        value: mhillsma-cluster
-      - op: replace
-        path: /spec/platform/aws/type
-        value: m5.2xlarge
-      - op: replace
-        path: /spec/replicas
-        value: 0
+      metadata:
+        name: cluster-placeholder-worker
+        namespace: mhillsma-cluster
+      spec:
+        clusterDeploymentRef:
+          name: mhillsma-cluster
+        replicas: 0
+        platform:
+          aws:
+            type: m5.2xlarge
 
-  # Update ManagedCluster
-  - target:
+  # ManagedCluster configuration
+  - patch: |-
+      apiVersion: cluster.open-cluster-management.io/v1
       kind: ManagedCluster
-    patch: |-
-      - op: replace
-        path: /metadata/name
-        value: mhillsma-cluster
-      - op: replace
-        path: /metadata/labels/environment
-        value: development
+      metadata:
+        name: cluster-placeholder
+        labels:
+          environment: development
 
-  # Update KlusterletAddonConfig
-  - target:
+  # KlusterletAddonConfig configuration
+  - patch: |-
+      apiVersion: agent.open-cluster-management.io/v1
       kind: KlusterletAddonConfig
-    patch: |-
-      - op: replace
-        path: /metadata/name
-        value: mhillsma-cluster
-      - op: replace
-        path: /metadata/namespace
-        value: mhillsma-cluster
-      - op: replace
-        path: /spec/clusterName
-        value: mhillsma-cluster
-      - op: replace
-        path: /spec/clusterNamespace
-        value: mhillsma-cluster
-
-  # Update install-config Secret
-  - target:
-      kind: Secret
-      name: cluster-placeholder-install-config
-    patch: |-
-      - op: replace
-        path: /metadata/name
-        value: mhillsma-cluster-install-config
-      - op: replace
-        path: /metadata/namespace
-        value: mhillsma-cluster
-      - op: replace
-        path: /stringData/install-config.yaml
-        value: |
-          apiVersion: v1
-          baseDomain: openshiftpartnerlabs.com
-          metadata:
-            name: mhillsma-cluster
-
-          controlPlane:
-            name: master
-            platform:
-              aws:
-                type: m5.4xlarge
-                rootVolume:
-                  iops: 4000
-                  size: 120
-                  type: gp3
-                zones:
-                  - us-east-1a
-            replicas: 1
-
-          compute:
-            - name: worker
-              platform:
-                aws:
-                  type: m5.2xlarge
-                  rootVolume:
-                    iops: 2000
-                    size: 100
-                    type: gp3
-                  zones:
-                    - us-east-1a
-              replicas: 0
-
-          networking:
-            clusterNetwork:
-              - cidr: 10.128.0.0/14
-                hostPrefix: 23
-            machineNetwork:
-              - cidr: 10.0.0.0/16
-            serviceNetwork:
-              - 172.30.0.0/16
-            networkType: OVNKubernetes
-
-          platform:
-            aws:
-              region: us-east-1
-
-          fips: false
-          publish: External
-
-# Hive will automatically populate clusterMetadata fields after provisioning
+      metadata:
+        name: cluster-placeholder
+        namespace: mhillsma-cluster
+      spec:
+        clusterName: mhillsma-cluster
+        clusterNamespace: mhillsma-cluster
