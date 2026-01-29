@@ -1,0 +1,52 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mhillsma-cluster
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+  labels:
+    cluster-name: mhillsma-cluster
+    environment: development
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: mhillsma-cluster-provisioning
+
+  source:
+    repoURL: https://github.com/mrhillsman/opl-argocd.git
+    targetRevision: master
+    path: clusters/mhillsma-cluster
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mhillsma-cluster
+
+  syncPolicy:
+    automated:
+      prune: true  # Don't auto-delete cluster resources
+      selfHeal: true  # CRITICAL: Disable selfHeal to prevent deletion of Hive-created secrets
+      allowEmpty: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 10m
+
+  # Ignore differences in dynamic fields
+  ignoreDifferences:
+    - group: hive.openshift.io
+      kind: ClusterDeployment
+      jsonPointers:
+        - /status
+        - /spec/clusterMetadata  # Ignore entire clusterMetadata section (Hive-managed)
+        - /spec/installed  # Ignore installed timestamp (Hive-managed)
+    - group: cluster.open-cluster-management.io
+      kind: ManagedCluster
+      jsonPointers:
+        - /status
+        - /spec/managedClusterClientConfigs
