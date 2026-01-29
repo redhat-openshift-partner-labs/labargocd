@@ -42,6 +42,8 @@ metadata:
   name: deprovision-cleanup
   namespace: openshift-gitops
 spec:
+  imagePullSecrets:
+    - name: 12648643-deprovision-cleanup-sa-pull-secret
   schedule: "*/5 * * * *"
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 3
@@ -71,18 +73,10 @@ spec:
                   echo "=== Deprovision Cleanup - $(date) ==="
                   echo ""
 
-                  # Hybrid approach: Query labeled secrets (fast) + fallback for unlabeled (transition)
-                  LABELED_SECRETS=$(oc get secrets -A -l "$DEPROVISION_LABEL=true" \
+                  # Query labeled secrets
+                  SECRETS=$(oc get secrets -A -l "$DEPROVISION_LABEL=true" \
                     -o jsonpath='{range .items[*]}{.metadata.namespace}/{.metadata.name}{"\n"}{end}' \
                     2>/dev/null | grep -v '^$' || echo "")
-
-                  # Fallback: Find secrets with finalizer but no label (legacy)
-                  FINALIZER_SECRETS=$(oc get secrets -A -o json 2>/dev/null | \
-                    jq -r ".items[] | select(.metadata.finalizers[]? == \"$FINALIZER\") | select(.metadata.labels[\"$DEPROVISION_LABEL\"] != \"true\") | \"\(.metadata.namespace)/\(.metadata.name)\"" \
-                    2>/dev/null || echo "")
-
-                  # Combine both lists, remove duplicates
-                  SECRETS=$(echo -e "$LABELED_SECRETS\n$FINALIZER_SECRETS" | grep -v '^$' | sort -u || echo "")
 
                   if [[ -z "$SECRETS" ]]; then
                     echo "No secrets pending cleanup"
@@ -116,14 +110,36 @@ spec:
                     if [[ "$JOB_COMPLETE" == "True" ]]; then
                       echo "  Uninstall completed - removing finalizer"
 
-                      # Remove finalizer
-                      INDEX=$(oc get secret "$SECRET_NAME" -n "$NAMESPACE" -o json | \
-                        jq -r ".metadata.finalizers | to_entries | .[] | select(.value==\"$FINALIZER\") | .key" \
-                        2>/dev/null || echo "")
+                      # Get current finalizers using jsonpath
+                      CURRENT_FINALIZERS=$(oc get secret "$SECRET_NAME" -n "$NAMESPACE" \
+                        -o jsonpath='{.metadata.finalizers[*]}' 2>/dev/null || echo "")
 
-                      if [[ -n "$INDEX" ]]; then
-                        oc patch secret "$SECRET_NAME" -n "$NAMESPACE" --type=json \
-                          -p="[{\"op\": \"remove\", \"path\": \"/metadata/finalizers/$INDEX\"}]"
+                      echo "  Current finalizers: $CURRENT_FINALIZERS"
+
+                      if [[ "$CURRENT_FINALIZERS" == *"$FINALIZER"* ]]; then
+                        # Build new finalizers array without our finalizer
+                        NEW_ARRAY="["
+                        FIRST=true
+                        for fin in $CURRENT_FINALIZERS; do
+                          if [[ "$fin" != "$FINALIZER" ]]; then
+                            if [[ "$FIRST" == "true" ]]; then
+                              NEW_ARRAY="${NEW_ARRAY}\"${fin}\""
+                              FIRST=false
+                            else
+                              NEW_ARRAY="${NEW_ARRAY},\"${fin}\""
+                            fi
+                          fi
+                        done
+                        NEW_ARRAY="${NEW_ARRAY}]"
+
+                        echo "  New finalizers: $NEW_ARRAY"
+
+                        # Use merge patch to replace finalizers
+                        oc patch secret "$SECRET_NAME" -n "$NAMESPACE" --type=merge \
+                          -p="{\"metadata\":{\"finalizers\":$NEW_ARRAY}}"
+                        echo "  Finalizer removed"
+                      else
+                        echo "  Finalizer not found or already removed"
                       fi
 
                       # Remove tracking label

@@ -145,28 +145,38 @@ sequenceDiagram
     ArgoCD->>ArgoCD: App-of-Apps detects missing manifest
     ArgoCD->>K8s: Delete Application: <cluster>
 
-    Note over User,CronJob: ══════════════════════════════════════════<br/>PHASE 9: Resource Deletion<br/>══════════════════════════════════════════
+    Note over User,CronJob: ══════════════════════════════════════════<br/>PHASE 9: Resource Deletion Requests<br/>══════════════════════════════════════════
 
     ArgoCD->>K8s: Delete KlusterletAddonConfig
     ArgoCD->>K8s: Delete ManagedCluster
     ArgoCD->>K8s: Delete MachinePool
     ArgoCD->>K8s: Delete ClusterDeployment
 
-    K8s-->>Hive: ClusterDeployment deletion detected
+    rect rgb(255, 248, 220)
+        Note over K8s,Hive: ClusterDeployment blocked by Hive finalizer
+        K8s->>K8s: ClusterDeployment enters Terminating state
+        K8s->>K8s: Blocked by finalizer: hive.openshift.io/deprovision
+    end
+
+    K8s-->>Hive: ClusterDeployment Terminating state detected
     Hive->>K8s: Create ClusterDeprovision
     Hive->>K8s: Create Job: <cluster>-uninstall
 
-    Note over User,CronJob: ══════════════════════════════════════════<br/>PHASE 10: Secrets Protected During Uninstall<br/>══════════════════════════════════════════
+    Note over User,CronJob: ══════════════════════════════════════════<br/>PHASE 10: Namespace Terminating (parallel with Hive)<br/>══════════════════════════════════════════
+
+    ArgoCD->>K8s: Delete Namespace: <cluster> (via Application finalizer)
+    K8s->>K8s: Namespace enters Terminating state
 
     rect rgb(255, 240, 240)
-        Note over K8s: Finalizers prevent secret deletion
-        ArgoCD->>K8s: Delete Secret: aws-credentials
-        K8s->>K8s: Blocked by finalizer (deletionTimestamp set)
-        ArgoCD->>K8s: Delete Secret: <cluster>-metadata-json
-        K8s->>K8s: Blocked by finalizer (deletionTimestamp set)
+        Note over K8s: Namespace deletion cascades to secrets
+        K8s->>K8s: Cascade delete Secret: aws-credentials
+        K8s->>K8s: Blocked by finalizer: openshiftpartnerlabs.com/deprovision
+        K8s->>K8s: Cascade delete Secret: <cluster>-metadata-json
+        K8s->>K8s: Blocked by finalizer: openshiftpartnerlabs.com/deprovision
+        Note over K8s: Namespace blocked until all finalized resources complete
     end
 
-    Note over Hive: Uninstall job reads protected secrets
+    Note over Hive: Uninstall job reads protected secrets (still accessible)
     Hive->>K8s: Read Secret: aws-credentials
     K8s-->>Hive: AWS access key, secret key
     Hive->>K8s: Read Secret: <cluster>-metadata-json
@@ -182,39 +192,34 @@ sequenceDiagram
     Hive->>AWS: Delete EBS volumes
     AWS-->>Hive: All resources deleted
 
-    Hive->>K8s: Update Job: <cluster>-uninstall status=Complete
+    Hive->>K8s: Update Job: <cluster>-uninstall status.succeeded=1
     Hive->>K8s: Delete ClusterDeprovision
+    Hive->>K8s: Remove finalizer from ClusterDeployment
+    K8s->>K8s: ClusterDeployment fully deleted
 
     Note over User,CronJob: ══════════════════════════════════════════<br/>PHASE 12: Cleanup CronJob Removes Finalizers<br/>══════════════════════════════════════════
 
     CronJob->>K8s: Query secrets with label: deprovision-pending=true
     K8s-->>CronJob: aws-credentials, <cluster>-metadata-json
 
+    CronJob->>CronJob: Extract cluster name from secret namespace
     CronJob->>K8s: Get Job: <cluster>-uninstall
-    K8s-->>CronJob: status.conditions[Complete]=True
+    K8s-->>CronJob: Job exists with status.succeeded=1
 
     rect rgb(240, 255, 240)
-        Note over CronJob,K8s: Releasing aws-credentials
+        Note over CronJob,K8s: Uninstall verified complete - safe to release secrets
         CronJob->>K8s: Remove finalizer from aws-credentials
-        CronJob->>K8s: Remove label from aws-credentials
-    end
-
-    rect rgb(240, 255, 240)
-        Note over CronJob,K8s: Releasing metadata-json
+        CronJob->>K8s: Remove label deprovision-pending from aws-credentials
         CronJob->>K8s: Remove finalizer from <cluster>-metadata-json
-        CronJob->>K8s: Remove label from <cluster>-metadata-json
+        CronJob->>K8s: Remove label deprovision-pending from <cluster>-metadata-json
     end
 
     Note over User,CronJob: ══════════════════════════════════════════<br/>PHASE 13: Final Cleanup<br/>══════════════════════════════════════════
 
-    K8s->>K8s: Delete Secret: aws-credentials (finalizer removed)
-    K8s->>K8s: Delete Secret: <cluster>-metadata-json (finalizer removed)
-    K8s->>K8s: Delete Secret: <cluster>-admin-kubeconfig
-    K8s->>K8s: Delete Secret: <cluster>-admin-password
-    K8s->>K8s: Delete Secret: <cluster>-install-config
-
-    ArgoCD->>K8s: Delete Namespace: <cluster>
-    K8s->>K8s: Namespace deleted
+    K8s->>K8s: Secret: aws-credentials deleted (finalizer removed)
+    K8s->>K8s: Secret: <cluster>-metadata-json deleted (finalizer removed)
+    K8s->>K8s: All remaining secrets deleted (cascade)
+    K8s->>K8s: Namespace <cluster> deletion completes
 
     Note over User,CronJob: ══════════════════════════════════════════<br/>LIFECYCLE COMPLETE<br/>══════════════════════════════════════════
 ```
@@ -240,9 +245,10 @@ sequenceDiagram
 - Idempotent: skips if finalizers already exist
 
 ### 2. Kubernetes Finalizers (Deletion Time)
-- Secrets with finalizers cannot be deleted
-- `deletionTimestamp` is set but object persists
-- Uninstall job can still read the secrets
+- Secrets with finalizer `openshiftpartnerlabs.com/deprovision` cannot be deleted
+- `deletionTimestamp` is set but object persists in Terminating state
+- Uninstall job can still read the secrets while they are in Terminating state
+- ClusterDeployment is also protected by Hive's `hive.openshift.io/deprovision` finalizer
 
 ### 3. Cleanup CronJob (Post-Uninstall)
 - Runs every 5 minutes
