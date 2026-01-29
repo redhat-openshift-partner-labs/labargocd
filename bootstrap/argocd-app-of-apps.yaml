@@ -25,7 +25,7 @@ spec:
     automated:
       prune: true  # Set to true to auto-delete removed clusters (use with caution!)
       selfHeal: true
-      allowEmpty: false
+      allowEmpty: true
     syncOptions:
       - CreateNamespace=true
     retry:
