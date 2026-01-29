@@ -1,0 +1,124 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: deprovision-cleanup-sa
+  namespace: openshift-gitops
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: deprovision-cleanup-role
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "patch"]
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: deprovision-cleanup-binding
+subjects:
+  - kind: ServiceAccount
+    name: deprovision-cleanup-sa
+    namespace: openshift-gitops
+roleRef:
+  kind: ClusterRole
+  name: deprovision-cleanup-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: deprovision-cleanup
+  namespace: openshift-gitops
+spec:
+  schedule: "*/2 * * * *"  # Every 2 minutes
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        spec:
+          serviceAccountName: deprovision-cleanup-sa
+          restartPolicy: Never
+          containers:
+            - name: cleanup
+              image: registry.redhat.io/openshift4/ose-cli:latest
+              env:
+                - name: FINALIZER
+                  value: "openshiftpartnerlabs.com/deprovision"
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  set -e
+
+                  echo "=== Deprovision Cleanup Job - $(date) ==="
+                  echo ""
+
+                  # Find all secrets with our finalizer across all namespaces
+                  SECRETS_WITH_FINALIZER=$(oc get secrets -A -o json | \
+                    jq -r ".items[] | select(.metadata.finalizers[]? == \"$FINALIZER\") | \"\(.metadata.namespace)/\(.metadata.name)\"" 2>/dev/null || echo "")
+
+                  if [[ -z "$SECRETS_WITH_FINALIZER" ]]; then
+                    echo "No secrets found with finalizer $FINALIZER"
+                    exit 0
+                  fi
+
+                  echo "Found secrets with finalizer:"
+                  echo "$SECRETS_WITH_FINALIZER"
+                  echo ""
+
+                  for secret_ref in $SECRETS_WITH_FINALIZER; do
+                    NAMESPACE=$(echo "$secret_ref" | cut -d'/' -f1)
+                    SECRET_NAME=$(echo "$secret_ref" | cut -d'/' -f2)
+
+                    echo "Processing: $NAMESPACE/$SECRET_NAME"
+
+                    # Derive cluster name from namespace (assumes namespace = cluster name)
+                    CLUSTER_NAME="$NAMESPACE"
+                    UNINSTALL_JOB="${CLUSTER_NAME}-uninstall"
+
+                    # Check if uninstall job exists and has completed
+                    JOB_STATUS=$(oc get job "$UNINSTALL_JOB" -n "$NAMESPACE" -o jsonpath='{.status.conditions[?(@.type=="Complete")].status}' 2>/dev/null || echo "")
+
+                    if [[ "$JOB_STATUS" == "True" ]]; then
+                      echo "  Uninstall job $UNINSTALL_JOB completed successfully"
+                      echo "  Removing finalizer from $SECRET_NAME..."
+
+                      # Get the index of our finalizer
+                      INDEX=$(oc get secret "$SECRET_NAME" -n "$NAMESPACE" -o json | \
+                        jq -r ".metadata.finalizers | to_entries | .[] | select(.value==\"$FINALIZER\") | .key" 2>/dev/null || echo "")
+
+                      if [[ -n "$INDEX" ]]; then
+                        oc patch secret "$SECRET_NAME" -n "$NAMESPACE" --type=json \
+                          -p="[{\"op\": \"remove\", \"path\": \"/metadata/finalizers/$INDEX\"}]"
+                        echo "  Finalizer removed from $SECRET_NAME"
+                      else
+                        echo "  Finalizer not found (may have been removed already)"
+                      fi
+                    else
+                      # Check if job failed
+                      JOB_FAILED=$(oc get job "$UNINSTALL_JOB" -n "$NAMESPACE" -o jsonpath='{.status.conditions[?(@.type=="Failed")].status}' 2>/dev/null || echo "")
+                      if [[ "$JOB_FAILED" == "True" ]]; then
+                        echo "  WARNING: Uninstall job $UNINSTALL_JOB FAILED - manual intervention required"
+                      elif oc get job "$UNINSTALL_JOB" -n "$NAMESPACE" &>/dev/null; then
+                        echo "  Uninstall job $UNINSTALL_JOB still running, skipping..."
+                      else
+                        echo "  Uninstall job $UNINSTALL_JOB not found yet, skipping..."
+                      fi
+                    fi
+
+                    echo ""
+                  done
+
+                  echo "=== Cleanup job completed ==="

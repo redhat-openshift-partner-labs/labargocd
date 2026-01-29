@@ -6,6 +6,7 @@ namespace: mhillsma-cluster
 resources:
   - ../../cluster-templates/aws-ha/base
   - cluster-config.yaml
+  - deprovision-finalizer-job.yaml
   #- cluster-start-cronjob.yaml
 
 # Patches to customize the cluster

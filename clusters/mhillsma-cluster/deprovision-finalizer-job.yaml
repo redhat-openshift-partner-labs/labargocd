@@ -1,0 +1,96 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: deprovision-finalizer-sa
+  namespace: mhillsma-cluster
+  annotations:
+    argocd.argoproj.io/hook: PreDelete
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: deprovision-finalizer-role
+  namespace: mhillsma-cluster
+  annotations:
+    argocd.argoproj.io/hook: PreDelete
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: deprovision-finalizer-binding
+  namespace: mhillsma-cluster
+  annotations:
+    argocd.argoproj.io/hook: PreDelete
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+subjects:
+  - kind: ServiceAccount
+    name: deprovision-finalizer-sa
+    namespace: mhillsma-cluster
+roleRef:
+  kind: Role
+  name: deprovision-finalizer-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: add-deprovision-finalizers
+  namespace: mhillsma-cluster
+  annotations:
+    argocd.argoproj.io/hook: PreDelete
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      serviceAccountName: deprovision-finalizer-sa
+      restartPolicy: Never
+      containers:
+        - name: add-finalizers
+          image: registry.redhat.io/openshift4/ose-cli:latest
+          env:
+            - name: CLUSTER_NAME
+              value: "mhillsma-cluster"
+            - name: NAMESPACE
+              value: "mhillsma-cluster"
+            - name: FINALIZER
+              value: "openshiftpartnerlabs.com/deprovision"
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -e
+
+              SECRETS=("aws-credentials" "${CLUSTER_NAME}-metadata-json")
+
+              echo "Adding finalizers to secrets to preserve them during deprovision..."
+              for secret in "${SECRETS[@]}"; do
+                echo "Checking secret: $secret"
+                if oc get secret "$secret" -n "$NAMESPACE" &>/dev/null; then
+                  existing=$(oc get secret "$secret" -n "$NAMESPACE" -o jsonpath='{.metadata.finalizers}' 2>/dev/null || echo "")
+                  if [[ "$existing" == *"$FINALIZER"* ]]; then
+                    echo "  Finalizer already exists on $secret"
+                  else
+                    echo "  Adding finalizer to $secret"
+                    if [[ -z "$existing" || "$existing" == "null" ]]; then
+                      oc patch secret "$secret" -n "$NAMESPACE" --type=json \
+                        -p="[{\"op\": \"add\", \"path\": \"/metadata/finalizers\", \"value\": [\"$FINALIZER\"]}]"
+                    else
+                      oc patch secret "$secret" -n "$NAMESPACE" --type=json \
+                        -p="[{\"op\": \"add\", \"path\": \"/metadata/finalizers/-\", \"value\": \"$FINALIZER\"}]"
+                    fi
+                    echo "  Finalizer added to $secret"
+                  fi
+                else
+                  echo "  Secret $secret not found, skipping"
+                fi
+              done
+
+              echo "Done adding finalizers."
