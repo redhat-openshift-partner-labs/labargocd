@@ -23,13 +23,11 @@ spec:
 
   syncPolicy:
     automated:
-      prune: false  # Set to true to auto-delete removed clusters (use with caution!)
+      prune: true  # Set to true to auto-delete removed clusters (use with caution!)
       selfHeal: true
       allowEmpty: false
     syncOptions:
       - CreateNamespace=true
-      #- PrunePropagationPolicy=foreground
-      #- PruneLast=true
     retry:
       limit: 5
       backoff:
