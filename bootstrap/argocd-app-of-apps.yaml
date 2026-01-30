@@ -2,16 +2,16 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: mhillsma-cluster-provisioning-apps
+  name: cluster-provisioning-apps-argocd
   namespace: openshift-gitops
   annotations:
     argocd.argoproj.io/sync-wave: "1"
 spec:
-  project: mhillsma-cluster-provisioning
+  project: cluster-provisioning-argocd
 
   source:
-    repoURL: https://github.com/mrhillsman/opl-argocd.git
-    targetRevision: master
+    repoURL: https://github.com/redhat-openshift-partner-labs/labargocd.git
+    targetRevision: main
     path: clusters
     directory:
       recurse: true

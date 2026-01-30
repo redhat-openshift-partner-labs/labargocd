@@ -15,7 +15,7 @@ spec:
   platform:
     aws:
       rootVolume:
-        iops: 2000
+        iops: 4000
         size: 100
         type: gp3
       type: m5.2xlarge  # Will be overridden by overlay
@@ -25,7 +25,7 @@ spec:
         - us-east-1c
 
   # Number of worker nodes
-  replicas: 3  # Will be overridden by overlay
+  replicas: 0  # Will be overridden by overlay
 
   # Auto-scaling configuration (optional)
   # autoscaling:
