@@ -10,8 +10,10 @@ resources:
 
 # Common labels applied to all resources
 labels:
-  provisioner: hive
-  managed-by: argocd
+  - pairs:
+      provisioner: hive
+      managed-by: argocd
+    includeSelectors: true
 
 # Namespace for all resources (will be overridden by overlay)
 namespace: cluster-placeholder
