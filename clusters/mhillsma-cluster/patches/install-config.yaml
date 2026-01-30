@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: cluster-placeholder-install-config
-  namespace: mhillsma-cluster
+  namespace: cluster-placeholder
 stringData:
   install-config.yaml: |
     apiVersion: v1

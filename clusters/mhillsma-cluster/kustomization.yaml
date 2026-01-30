@@ -16,7 +16,7 @@ patches:
       kind: ClusterDeployment
       metadata:
         name: cluster-placeholder
-        namespace: mhillsma-cluster
+        namespace: cluster-placeholder
       spec:
         clusterName: mhillsma-cluster
         baseDomain: openshiftpartnerlabs.com
@@ -27,7 +27,7 @@ patches:
           imageSetRef:
             name: img4.20.10-x86-64-appsub
           installConfigSecretRef:
-            name: mhillsma-cluster-install-config
+            name: cluster-placeholder-install-config
           sshPrivateKeySecretRef:
             name: mhillsma-cluster-ssh-key
           manifestsConfigMapRef: null
@@ -38,7 +38,7 @@ patches:
       kind: MachinePool
       metadata:
         name: cluster-placeholder-worker
-        namespace: mhillsma-cluster
+        namespace: cluster-placeholder
       spec:
         clusterDeploymentRef:
           name: mhillsma-cluster
@@ -62,7 +62,7 @@ patches:
       kind: KlusterletAddonConfig
       metadata:
         name: cluster-placeholder
-        namespace: mhillsma-cluster
+        namespace: cluster-placeholder
       spec:
         clusterName: mhillsma-cluster
         clusterNamespace: mhillsma-cluster
