@@ -9,7 +9,7 @@ resources:
   - deprovision-finalizer-job.yaml
 
 # Common labels applied to all resources
-commonLabels:
+labels:
   provisioner: hive
   managed-by: argocd
 
