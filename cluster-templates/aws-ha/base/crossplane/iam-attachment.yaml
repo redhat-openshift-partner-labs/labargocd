@@ -1,0 +1,12 @@
+apiVersion: iam.aws.upbound.io/v1beta1
+kind: UserPolicyAttachment
+metadata:
+  name: ocp-installer-policy-attachment
+  labels:
+    app.kubernetes.io/part-of: ocp-installer
+spec:
+  forProvider:
+    userRef:
+      name: ocp-installer
+    policyArnRef:
+      name: openshift4-installer-policy
