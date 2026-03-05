@@ -5,6 +5,8 @@ namespace: dev-cluster-01
 
 resources:
   - ../../cluster-templates/aws-ha/base
+  # Note: Cluster-scoped Crossplane resources (Provider, ProviderConfig)
+  # are in bootstrap/ and applied once cluster-wide
 
 patches:
   # Install config secret content - must come before rename
@@ -33,6 +35,9 @@ patches:
       - op: replace
         path: /spec/provisioning/installConfigSecretRef/name
         value: dev-cluster-01-install-config
+      - op: replace
+        path: /spec/provisioning/sshPrivateKeySecretRef/name
+        value: ssh-key
       - op: remove
         path: /spec/provisioning/manifestsConfigMapRef
 
@@ -89,3 +94,13 @@ patches:
       - op: replace
         path: /metadata/name
         value: dev-cluster-01-install-config
+
+  # Fix AccessKey namespace for secret
+  - target:
+      group: iam.aws.upbound.io
+      kind: AccessKey
+      name: ocp-installer-access-key
+    patch: |-
+      - op: replace
+        path: /spec/writeConnectionSecretToRef/namespace
+        value: dev-cluster-01

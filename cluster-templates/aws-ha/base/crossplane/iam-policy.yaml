@@ -2,6 +2,8 @@ apiVersion: iam.aws.upbound.io/v1beta1
 kind: Policy
 metadata:
   name: openshift4-installer-policy
+  annotations:
+    argocd.argoproj.io/sync-wave: "-4"
   labels:
     app.kubernetes.io/part-of: ocp-installer
 spec:
@@ -56,11 +58,16 @@ spec:
               "iam:ListInstanceProfiles",
               "iam:ListRolePolicies",
               "iam:ListUserPolicies",
+              "iam:AttachUserPolicy",
+              "iam:CreateAccessKey",
+              "iam:CreateUser",
               "iam:DeleteAccessKey",
               "iam:DeleteUser",
               "iam:DeleteUserPolicy",
+              "iam:DetachUserPolicy",
               "iam:GetUserPolicy",
               "iam:ListAccessKeys",
+              "iam:ListAttachedUserPolicies",
               "iam:PutUserPolicy",
               "iam:TagUser"
             ],

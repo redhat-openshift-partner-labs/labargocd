@@ -2,11 +2,22 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
+  # Crossplane namespace-scoped resources
+  - crossplane/iam-user.yaml
+  - crossplane/iam-policy.yaml
+  - crossplane/iam-attachment.yaml
+  - crossplane/iam-access-key.yaml
+  - crossplane/credentials-transformer-job.yaml
+  # Cluster resources
   - clusterdeployment.yaml
   - machinepool-worker.yaml
   - managedcluster.yaml
   - install-config-secret.yaml
   - deprovision-finalizer-job.yaml
+
+# Note: Cluster-scoped resources (Provider, ProviderConfig) are in
+# crossplane/cluster-scoped/ and must be added at the overlay level
+# to avoid namespace transformation
 
 # Common labels applied to all resources
 labels:
@@ -15,5 +26,5 @@ labels:
       managed-by: argocd
     includeSelectors: true
 
-# Namespace for all resources (will be overridden by overlay)
+# Namespace for namespace-scoped resources only (will be overridden by overlay)
 namespace: cluster-placeholder

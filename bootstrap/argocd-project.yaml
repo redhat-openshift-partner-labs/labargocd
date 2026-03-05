@@ -39,6 +39,22 @@ spec:
       kind: ManagedClusterSet
     - group: cluster.open-cluster-management.io
       kind: ManagedClusterSetBinding
+    # Crossplane resources (cluster-scoped)
+    - group: pkg.crossplane.io
+      kind: Provider
+    - group: pkg.crossplane.io
+      kind: ProviderRevision
+    - group: aws.upbound.io
+      kind: ProviderConfig
+    # Crossplane IAM resources (cluster-scoped)
+    - group: iam.aws.upbound.io
+      kind: User
+    - group: iam.aws.upbound.io
+      kind: Policy
+    - group: iam.aws.upbound.io
+      kind: UserPolicyAttachment
+    - group: iam.aws.upbound.io
+      kind: AccessKey
 
   # Namespace resource whitelist
   namespaceResourceWhitelist:
